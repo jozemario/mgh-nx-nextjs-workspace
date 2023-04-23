@@ -1,0 +1,4 @@
+[submodule "workspace"]
+	path = @mghcloud
+	url = https://github.com/jozemario/mgh-nx-nextjs-mghcloud
+
