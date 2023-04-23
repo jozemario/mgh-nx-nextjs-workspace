@@ -1,3 +1,4 @@
+```
 git remote add origin git@github.com:jozemario/mgh-nx-nextjs-workspace.git
 git branch -M master
 git push -u origin master
@@ -90,6 +91,7 @@ You can import a library called my-new-lib in your application as follows.
 
 apps/my-next-app/pages/index.tsx
 ```
+```typescript jsx
 import { MyNewLib } from '@<your nx workspace name>/my-new-lib';
 
 export function Index() {
@@ -101,6 +103,7 @@ return (
 }
 
 export default Index;
+```
 ```
 
 Publishable libraries
@@ -148,3 +151,49 @@ Next.js applications can be statically exported with:
 
 
 nx export my-new-app
+```
+```
+GIT SUBMODULES
+
+Step 1: Create a new git repository with submodules:
+Let’s start by creating a new git repository and adding submodules.
+
+git init
+git submodule add https://github.com/nrwl/nx-example-sharedlib sharedlib
+git submodule add https://github.com/nrwl/nx-example-workspace workspace
+We can use git submodules to create a parent git repo composed of multiple child repos, which is exactly what we need. I won’t go into detail on how they work exactly. So if you aren’t familiar with them (and very few people are), read more here.
+
+Step 2: Set up yarn workspaces
+Next, let’s create a package.json file at the root to configure yarn workspaces.
+
+{
+  "private": true,
+  "workspaces": ["workspace", "sharedlib"]
+}
+-----------------
+
+git submodule update --remote --merge
+git submodule update --remote --rebase
+
+If you forget the --rebase or --merge, Git will just update the submodule to whatever is on the server and reset your project to a detached HEAD state.
+
+$ git submodule update --remote
+
+If we commit in the main project and push it up without pushing the submodule changes up as well, other people who try to check out our changes are going to be in trouble since they will have no way to get the submodule changes that are depended on. Those changes will only exist on our local copy.
+
+In order to make sure this doesn’t happen, you can ask Git to check that all your submodules have been pushed properly before pushing the main project. The git push command takes the --recurse-submodules argument which can be set to either “check” or “on-demand”. The “check” option will make push simply fail if any of the committed submodule changes haven’t been pushed.
+
+$ git push --recurse-submodules=check
+The following submodule paths contain changes that can
+not be found on any remote:
+  DbConnector
+
+Please try
+
+	git push --recurse-submodules=on-demand
+
+or cd to the path and use
+
+	git push
+
+```
