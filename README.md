@@ -13,6 +13,7 @@ npx create-nx-workspace@latest
 >  NX   Let's create a new workspace [https://nx.dev/getting-started/intro]
 
 ✔ Choose what to create                 · integrated
+
 ✔ What to create in the new workspace   · next
 ✔ Repository name                       · @mghcloud
 ✔ Application name                      · local-dev
@@ -35,7 +36,6 @@ nx g @nrwl/next:lib x-login-component --publishable --importPath=@mghcloud/x-log
 nx build local-dev
 nx build x-login-component
 nx serve local-dev --prod
-nx serve x-login-component --prod
 
 
 When using Next.js in Nx, you get the out-of-the-box support for TypeScript, Cypress, and Jest. No need to configure anything: watch mode, source maps, and typings just work.
@@ -197,3 +197,184 @@ or cd to the path and use
 	git push
 
 ```
+## Dev Notes
+
+<details><summary> Development </summary>
+<p>
+
+###### setup seed project
+```
+--------------------------------------
+nvm use 18
+npm install -g yarn nx
+npx create-nx-workspace@latest
+
+✔ Where would you like to create your workspace? · it-ciam-management
+✔ Which stack do you want to use? · none
+✔ Package-based or integrated? · integrated
+✔ Enable distributed caching to make your CI faster · No
+
+yarn add -D @nx/react
+yarn add -D @nx/node
+--------------------------------------
+```
+###### add apps, libs, configs with generators
+```
+--------------------------------------
+Apps
+nx generate @nx/node:application it-ciam-graphql-backend
+nx generate @nx/react:app it-ciam-admin-frontend
+nx generate @nx/react:app it-ciam-profile-management-frontend
+----
+Nx library 
+the --publishable option when generating a new Nx library if your intention is to distribute it outside the monorepo
+One particularity when generating a library with --publishable is that it requires you to also provide an --importPath. Your import path is the actual scope of your distributable package (e.g.: @myorg/mylib) - which needs to be a valid npm package name.
+
+nx generate @nx/react:library shared-components --publishable --importPath=@it-ciam-management/shared-components
+
+----
+Remove apps, libs
+nx g @nx/workspace:remove shared-components
+nx g @nx/workspace:remove cypress-commands
+----
+Nx Node Docker Options Schema.
+nx generate setup-docker @nx/node:application
+npx nx docker-build it-ciam-graphql-backend
+----
+Generate a Micro-service with a Docker File
+npx nx g @nx/node:app orders-api --docker
+----
+Add Tailwind to NX project
+
+Breakpoint prefix	Minimum width	CSS
+sm	640px	@media (min-width: 640px) { ... }
+md	768px	@media (min-width: 768px) { ... }
+lg	1024px	@media (min-width: 1024px) { ... }
+xl	1280px	@media (min-width: 1280px) { ... }
+2xl	1536px	@media (min-width: 1536px) { ... }
+
+yarn add tailwindcss@latest postcss@latest autoprefixer@latest
+yarn add @tailwindcss/typography
+yarn add @tailwindcss/forms
+nx g @nx/react:setup-tailwind --project=it-ciam-admin-frontend
+nx g @nx/react:setup-tailwind --project=it-ciam-profile-management-frontend
+
+By specifying the postcssConfig option, the PostCSS and Tailwind configuration will be applied to all libraries used by the application as well.
+Using library-specific configuration files
+If your libraries have their own postcss.config.js and tailwind.config.js files then you should not use the postcssConfig option. Doing so will ignore the library-specific configuration and apply the application's configuration to everything.
+
+nx g @nx/react:setup-tailwind --project=shared-components
+
+----
+ yarn add @headlessui/react @heroicons/react
+
+----
+State Management
+Apollo is a shared cache. You can just do useQuery(GET_SETTINGS); in every component that needs that data - if it's already in the cache, nothing to be done. Otherwise it will get it.
+No need to replicate that in redux - apollo is now your cache state manager while redux is there for all the other data.
+
+redux toolkit
+nx generate @nx/react:library store --publishable --importPath=@it-ciam-management/store
+
+nx g @nx/react:redux --dry-run --name=admin --project=store
+nx g @nx/react:redux --name=admin --project=store
+
+apollo client(graphql)
+
+yarn add apollo-boost @apollo/react-hooks graphql
+yarn add -D @graphql-codegen/cli @graphql-codegen/typescript-operations @graphql-codegen/typescript-react-apollo
+nx g @nx/react:library graphql --publishable --importPath=@it-ciam-management/graphql
+
+Add a new task in project.json to run grapqhl code generator:
+
+"create-script": {
+    "executor": "nx:run-commands",
+    "options": {
+        "commands": [
+          "mkdir -p apps/frontend/scripts",
+          "touch apps/frontend/scripts/my-script.sh",
+          "chmod +x apps/frontend/scripts/my-script.sh"
+        ],
+        "parallel": false
+    }
+}
+
+nx run graphql:generate 
+nx g component SetList --project=graphql --directory=lib/utils
+nx g component SetForm --project=graphql --directory=lib/utils
+
+Backend
+yarn add --exact graphql-yoga
+
+
+----
+Development environment
+git clone git@cd.splunkdev.com:it-engineering/identity/it-ciam-management.git
+cd it-ciam-management
+nvm use 18
+yarn
+----
+Testing
+yarn add --dev @nx/cypress 
+nx generate @nx/js:library --name=cypress-commands --buildable=false --publishable --importPath=@it-ciam-management/cypress-commands
+✔ Which unit test runner would you like to use? · jest
+✔ Which bundler would you like to use to build the library? Choose 'none' to skip build setup. · tsc
+Each Nx lib is already set up and configured to work well with TypeScript. There is a
+tsconfig.json which is the entry level TypeScript config file and extends from the root-level tsconfig.base.json
+tsconfig.lib.json which holds the library specific TypeScript configuration
+tsconfig.spec.json which is mainly for Jest tests
+To make Cypress types work, we need to add cypress and node to the types property of the compilerOptions in tsconfig.lib.json:
+
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    ...
+    "types": ["cypress", "node"]
+  },
+  ...
+}
+ add import '@it-ciam-management/cypress-commands' to app-e2e/src/support/e2e.ts
+
+nx e2e it-ciam-admin-frontend-e2e
+nx e2e it-ciam-admin-frontend-e2e --watch
+nx e2e it-ciam-profile-management-frontend-e2e
+nx e2e it-ciam-graphql-backend-e2e
+nx test shared-components
+
+nx run-many -t e2e
+nx run-many -t test
+----
+Serve apps
+nx serve it-ciam-admin-frontend
+nx serve it-ciam-admin-frontend --prod
+nx serve it-ciam-profile-management-frontend
+nx serve it-ciam-graphql-backend
+----
+nx build it-ciam-admin-frontend --prod
+nx build it-ciam-profile-management-frontend --prod
+nx build it-ciam-graphql-backend --prod
+--------------------------------------
+```
+###### add components
+
+```
+--------------------------------------
+Generate a component in the shared-components library:
+nx g @nx/react:component ...
+nx g component sideBar --project=shared-components
+nx g component contentView --project=shared-components
+nx g component callToAction --project=shared-components
+nx g component navBar --project=shared-components
+nx g component baseLayout --project=shared-components --directory=lib/layouts
+nx g component sidebarLayout --project=shared-components --directory=lib/layouts
+nx g component dashboard --project=shared-components --directory=lib/views
+nx g component locale --project=shared-components --directory=lib/utils
+nx g component constant --project=shared-components --directory=lib/utils
+
+nx g component splunkLogo --project=shared-components --directory=lib/common
+nx g component appRoutes --project=it-ciam-admin-frontend
+--------------------------------------
+```
+
+</p>
+</details>
